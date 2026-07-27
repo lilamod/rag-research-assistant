@@ -173,17 +173,33 @@ deploy log shows the build succeeding but then:
 ==> Out of memory (used over 512Mi)
 ==> No open ports detected, continuing to scan...
 ```
-switch to OpenAI embeddings instead, which have no heavy local dependency:
+switch to a lightweight remote embeddings provider instead, which has no
+heavy local dependency:
 1. Install from `requirements-cloud.txt` instead of `requirements.txt`
    (build command: `pip install -r requirements-cloud.txt`) — this is
    already what `render.yaml` does.
-2. Set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY=...` in your host's
+2. Set `EMBEDDING_PROVIDER=voyage` and `VOYAGE_API_KEY=...` in your host's
    environment variables (needed even if `LLM_PROVIDER=anthropic` — the two
-   are independent).
+   are independent). Voyage AI is recommended here because it has a genuine
+   free tier (200M tokens on current models, no card required) — sign up at
+   https://dashboard.voyageai.com. `EMBEDDING_PROVIDER=openai` also works if
+   you'd rather use OpenAI, but its embeddings API has no free quota; it
+   needs a funded account (see the next troubleshooting entry below for a
+   related pitfall).
 3. Redeploy. Memory use drops enormously since no ML runtime needs to load.
 
 If you'd rather keep local embeddings, you'll need a host/plan with at least
 ~1–2GB RAM (Render's paid plans, Railway, Fly.io with a bigger machine, etc.).
+
+#### If you hit `openai.RateLimitError: ... insufficient_quota`
+
+This means your OpenAI account has no billing set up — the OpenAI **API** is
+a separate, pay-as-you-go product from ChatGPT's free web tier, and it isn't
+usable at all without a payment method on file, even for tiny amounts of
+usage. Either add a few dollars of credit at
+https://platform.openai.com/settings/organization/billing/overview, or
+switch to `EMBEDDING_PROVIDER=voyage` (see above), which has an actual free
+tier and needs no billing information to get started.
 
 #### If you hit `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`
 
@@ -243,11 +259,13 @@ vercel --prod
 | `LLM_PROVIDER`     | `anthropic`                                   | `anthropic` or `openai`                  |
 | `ANTHROPIC_API_KEY`| —                                              | required if provider is `anthropic`      |
 | `ANTHROPIC_MODEL`  | `claude-sonnet-4-6`                           |                                            |
-| `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` |
+| `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` (needs a funded OpenAI account - no free API quota) |
 | `OPENAI_MODEL`     | `gpt-4o-mini`                                 |                                            |
-| `EMBEDDING_PROVIDER`| `local`                                      | `local` (sentence-transformers) or `openai` (lightweight, recommended for small hosts) |
+| `EMBEDDING_PROVIDER`| `voyage`                                     | `voyage` (free tier, recommended), `openai` (paid only), or `local` (sentence-transformers, needs 1GB+ RAM) |
 | `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                | used when `EMBEDDING_PROVIDER=openai`    |
+| `VOYAGE_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=voyage` - free at https://dashboard.voyageai.com |
+| `VOYAGE_EMBEDDING_MODEL` | `voyage-4-lite`                         | used when `EMBEDDING_PROVIDER=voyage`    |
 | `CHUNK_SIZE`       | `1000`                                        | characters per chunk                     |
 | `CHUNK_OVERLAP`    | `150`                                         | characters shared between chunks         |
 | `TOP_K`            | `5`                                           | chunks retrieved per question            |

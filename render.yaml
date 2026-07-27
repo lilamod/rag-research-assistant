@@ -15,13 +15,14 @@ services:
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-4-6
       # Free-tier hosts (512MB RAM) can't fit torch/sentence-transformers,
-      # so embeddings run through OpenAI's API instead of the local model.
-      # This needs its own OPENAI_API_KEY even if LLM_PROVIDER is anthropic.
+      # so embeddings run through Voyage AI's API instead of the local
+      # model. Voyage has a genuine free tier (200M tokens), so this
+      # needs a VOYAGE_API_KEY but no billing setup, unlike OpenAI's API.
       - key: EMBEDDING_PROVIDER
-        value: openai
-      - key: OPENAI_API_KEY
+        value: voyage
+      - key: VOYAGE_API_KEY
         sync: false
-      - key: OPENAI_EMBEDDING_MODEL
-        value: text-embedding-3-small
+      - key: VOYAGE_EMBEDDING_MODEL
+        value: voyage-4-lite
       - key: CORS_ORIGINS
         value: "*"

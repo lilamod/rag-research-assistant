@@ -26,7 +26,11 @@ class Settings:
     #             torch (heavy: needs 1GB+ RAM, unsuitable for small hosts).
     # "openai" -> OpenAI's embeddings API, lightweight install, needs
     #             OPENAI_API_KEY (independent of LLM_PROVIDER for generation).
-    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local").lower()
+    #             No free quota - needs a funded OpenAI account.
+    # "voyage" -> Voyage AI's embeddings API, lightweight install, needs
+    #             VOYAGE_API_KEY. Comes with a genuine free tier (200M
+    #             tokens on current models) - good low-memory-host default.
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "voyage").lower()
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
@@ -34,6 +38,10 @@ class Settings:
         "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
     )
     OPENAI_EMBEDDING_DIM: int = int(os.getenv("OPENAI_EMBEDDING_DIM", "1536"))
+
+    VOYAGE_API_KEY: str = os.getenv("VOYAGE_API_KEY", "")
+    VOYAGE_EMBEDDING_MODEL: str = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-4-lite")
+    VOYAGE_EMBEDDING_DIM: int = int(os.getenv("VOYAGE_EMBEDDING_DIM", "1024"))
 
     # Chunking
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1000"))

@@ -1,6 +1,7 @@
 # Lightweight backend dependencies for low-memory hosts (e.g. Render free tier,
 # 512MB RAM). Excludes sentence-transformers/torch, which alone need 1GB+ RAM
-# just to import. Use this together with EMBEDDING_PROVIDER=openai in your env.
+# just to import. Use this together with EMBEDDING_PROVIDER=voyage (free tier,
+# recommended) or EMBEDDING_PROVIDER=openai (paid only) in your env.
 #
 # Install with: pip install -r requirements-cloud.txt
 fastapi==0.115.0
@@ -13,3 +14,4 @@ pypdf==4.3.1
 python-docx==1.1.2
 anthropic==0.40.0
 openai==1.109.1
+voyageai==0.3.2
