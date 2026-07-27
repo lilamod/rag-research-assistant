@@ -126,20 +126,33 @@ the split is:
 ### 1. Deploy the backend first
 
 Pick a host and deploy the `backend/` app. Two files are included to make this
-smooth on Render specifically: `runtime.txt` (pins Python to 3.11.9) and
+smooth on Render specifically: `.python-version` (pins Python to 3.11.9) and
 `render.yaml` (a ready-made service blueprint). Both matter because Render's
-newer default Python (3.13/3.14) doesn't have prebuilt wheels yet for pinned
+current default Python (3.14.x) doesn't have prebuilt wheels yet for pinned
 versions of `numpy`/`faiss-cpu` in `requirements.txt`, which fails the build
 with an error like:
 ```
 ERROR: Could not find a version that satisfies the requirement faiss-cpu==1.8.0.post1
 ```
-Pinning to 3.11.9 (via `runtime.txt`, or by setting the `PYTHON_VERSION`
-environment variable to `3.11.9` in your host's dashboard) fixes it.
+
+**Important:** Render dropped support for `runtime.txt` — as of now it only
+reads the Python version from, in order of precedence:
+1. The `PYTHON_VERSION` environment variable (must be a full version like `3.11.9`)
+2. A `.python-version` file at the repo root (this repo includes one)
+
+If you created your Render service **manually** (not via the `render.yaml`
+Blueprint), the `.python-version` file alone should be enough — but if the
+build still shows `Using Python version 3.14.3 (default)`, go to your
+service's **Environment** tab in the Render dashboard and add:
+```
+PYTHON_VERSION=3.11.9
+```
+then trigger a fresh deploy ("Manual Deploy → Clear build cache & deploy").
+The env var always wins over the file, so this is the most reliable fix.
 
 **On Render**, either:
 - Click "New → Blueprint", point it at this repo, and it'll read
-  `render.yaml` automatically, or
+  `render.yaml` automatically (which also sets `PYTHON_VERSION`), or
 - Create a Web Service manually with:
   - **Build command:** `pip install -r requirements.txt`
   - **Start command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
@@ -149,6 +162,28 @@ environment variable to `3.11.9` in your host's dashboard) fixes it.
 On any host, set its environment variables (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`
 / `OPENAI_API_KEY`, etc. — see table below). Note the public URL you get,
 e.g. `https://rag-backend.onrender.com`.
+
+#### If you hit "Out of memory" or "No open ports detected"
+
+The local embedding model (`EMBEDDING_PROVIDER=local`) pulls in `torch` +
+`sentence-transformers`, which alone need well over 512MB of RAM just to
+import — more than Render's (and many other) free tiers allow. If your
+deploy log shows the build succeeding but then:
+```
+==> Out of memory (used over 512Mi)
+==> No open ports detected, continuing to scan...
+```
+switch to OpenAI embeddings instead, which have no heavy local dependency:
+1. Install from `requirements-cloud.txt` instead of `requirements.txt`
+   (build command: `pip install -r requirements-cloud.txt`) — this is
+   already what `render.yaml` does.
+2. Set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY=...` in your host's
+   environment variables (needed even if `LLM_PROVIDER=anthropic` — the two
+   are independent).
+3. Redeploy. Memory use drops enormously since no ML runtime needs to load.
+
+If you'd rather keep local embeddings, you'll need a host/plan with at least
+~1–2GB RAM (Render's paid plans, Railway, Fly.io with a bigger machine, etc.).
 
 Also set, on the backend host:
 ```
@@ -196,14 +231,18 @@ vercel --prod
 | `LLM_PROVIDER`     | `anthropic`                                   | `anthropic` or `openai`                  |
 | `ANTHROPIC_API_KEY`| —                                              | required if provider is `anthropic`      |
 | `ANTHROPIC_MODEL`  | `claude-sonnet-4-6`                           |                                            |
-| `OPENAI_API_KEY`   | —                                              | required if provider is `openai`         |
+| `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` |
 | `OPENAI_MODEL`     | `gpt-4o-mini`                                 |                                            |
-| `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | any sentence-transformers model, local   |
+| `EMBEDDING_PROVIDER`| `local`                                      | `local` (sentence-transformers) or `openai` (lightweight, recommended for small hosts) |
+| `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                | used when `EMBEDDING_PROVIDER=openai`    |
 | `CHUNK_SIZE`       | `1000`                                        | characters per chunk                     |
 | `CHUNK_OVERLAP`    | `150`                                         | characters shared between chunks         |
 | `TOP_K`            | `5`                                           | chunks retrieved per question            |
 | `UPLOAD_DIR`       | `data/uploads`                                |                                            |
 | `INDEX_DIR`        | `data/index`                                  |                                            |
+| `CORS_ORIGINS`     | `*`                                           | comma-separated allowed origins          |
+| `RELOAD`           | `false`                                       | set `true` for local dev auto-reload; keep off in production |
 
 ## API reference
 

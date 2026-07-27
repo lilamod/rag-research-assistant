@@ -22,9 +22,18 @@ class Settings:
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     # Embeddings
+    # "local"  -> sentence-transformers, runs on CPU, no API key, but pulls in
+    #             torch (heavy: needs 1GB+ RAM, unsuitable for small hosts).
+    # "openai" -> OpenAI's embeddings API, lightweight install, needs
+    #             OPENAI_API_KEY (independent of LLM_PROVIDER for generation).
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local").lower()
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
+    OPENAI_EMBEDDING_MODEL: str = os.getenv(
+        "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
+    )
+    OPENAI_EMBEDDING_DIM: int = int(os.getenv("OPENAI_EMBEDDING_DIM", "1536"))
 
     # Chunking
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1000"))
@@ -40,6 +49,9 @@ class Settings:
     # Server
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
+    # Auto-reload on file changes - convenient for local dev, wasteful (extra
+    # watcher process + memory) in production. Off unless explicitly enabled.
+    RELOAD: bool = os.getenv("RELOAD", "false").lower() in ("1", "true", "yes")
 
     # CORS - comma-separated list of allowed origins, e.g.
     # "https://your-app.vercel.app,https://your-app-*.vercel.app"
