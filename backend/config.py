@@ -41,6 +41,13 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
 
+    # CORS - comma-separated list of allowed origins, e.g.
+    # "https://your-app.vercel.app,https://your-app-*.vercel.app"
+    # Defaults to "*" (allow all) for easy local/dev use.
+    CORS_ORIGINS: list = [
+        o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()
+    ]
+
     def ensure_dirs(self):
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         self.INDEX_DIR.mkdir(parents=True, exist_ok=True)

@@ -29,7 +29,7 @@ app = FastAPI(title="AI Research Assistant (RAG + LLM)", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

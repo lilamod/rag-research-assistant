@@ -112,6 +112,64 @@ cd ..
 python run.py           # FastAPI now also serves the built React app at /
 ```
 
+## Deploying (frontend on Vercel + backend elsewhere)
+
+Vercel only hosts static sites and serverless functions — it can't run the
+FastAPI backend, its FAISS index, or the local embedding model long-term. So
+the split is:
+
+- **Frontend → Vercel** (the `frontend/` folder)
+- **Backend → a regular server host** that can run a long-lived Python
+  process, e.g. Render, Railway, Fly.io, an EC2/DigitalOcean box, or a
+  container platform.
+
+### 1. Deploy the backend first
+
+Pick a host and deploy the `backend/` app (with `requirements.txt` and `run.py`,
+or point it at `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`). Set its
+environment variables there (`LLM_PROVIDER`, `ANTHROPIC_API_KEY` /
+`OPENAI_API_KEY`, etc. — see table below). Note the public URL you get, e.g.
+`https://rag-backend.onrender.com`.
+
+Also set, on the backend host:
+```
+CORS_ORIGINS=https://your-app.vercel.app
+```
+(You can add your Vercel preview-deployment pattern too, comma-separated,
+once you know it — or leave `CORS_ORIGINS=*` while testing.)
+
+> Note: `data/uploads` and `data/index` are local disk. Most of these hosts
+> reset local disk on redeploy/restart unless you attach a persistent volume
+> or switch `vector_store.py` to a hosted vector DB. For a quick demo this is
+> fine; for production, mount a persistent disk or swap the store.
+
+### 2. Deploy the frontend on Vercel
+
+From the `frontend/` folder (this repo already includes `vercel.json`):
+
+1. Push the repo to GitHub (or run `vercel` CLI directly from `frontend/`).
+2. In Vercel: **New Project → import this repo → set Root Directory to `frontend`**.
+3. Vercel auto-detects Vite (build command `npm run build`, output `dist`,
+   both already declared in `frontend/vercel.json`).
+4. Add an **Environment Variable**: `VITE_API_URL` = your backend's URL from
+   step 1 (e.g. `https://rag-backend.onrender.com`, no trailing slash). Add it
+   for Production, Preview, and Development as needed.
+5. Deploy.
+
+The frontend calls `${VITE_API_URL}/api/...` when that variable is set (see
+`frontend/src/api.js`), and falls back to relative `/api/...` (via the Vite
+dev proxy) when it isn't — so local dev is unaffected.
+
+### CLI alternative
+
+```bash
+cd frontend
+npm i -g vercel
+vercel link
+vercel env add VITE_API_URL production   # paste your backend URL
+vercel --prod
+```
+
 ## Configuration reference (`.env`)
 
 | Variable          | Default                                       | Notes                                   |
