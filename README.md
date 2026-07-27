@@ -185,6 +185,18 @@ switch to OpenAI embeddings instead, which have no heavy local dependency:
 If you'd rather keep local embeddings, you'll need a host/plan with at least
 ~1–2GB RAM (Render's paid plans, Railway, Fly.io with a bigger machine, etc.).
 
+#### If you hit `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`
+
+This is a known break between older `anthropic`/`openai` SDK releases and
+`httpx` 0.28+, which removed a deprecated argument those older SDK versions
+still pass internally. It surfaces the first time the app tries to create an
+Anthropic or OpenAI client — e.g. on your first chat request. Fixed by
+upgrading past the versions that had the bug: `anthropic>=0.40.0` and
+`openai>=1.55.3` (this repo pins `anthropic==0.40.0` and `openai==1.109.1`,
+both well past the fix). If you still see it, you likely have an older
+`requirements.txt`/`requirements-cloud.txt` deployed — redeploy with
+"Clear build cache" so pip actually re-resolves the pinned versions.
+
 Also set, on the backend host:
 ```
 CORS_ORIGINS=https://your-app.vercel.app
