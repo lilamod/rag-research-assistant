@@ -125,11 +125,30 @@ the split is:
 
 ### 1. Deploy the backend first
 
-Pick a host and deploy the `backend/` app (with `requirements.txt` and `run.py`,
-or point it at `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`). Set its
-environment variables there (`LLM_PROVIDER`, `ANTHROPIC_API_KEY` /
-`OPENAI_API_KEY`, etc. — see table below). Note the public URL you get, e.g.
-`https://rag-backend.onrender.com`.
+Pick a host and deploy the `backend/` app. Two files are included to make this
+smooth on Render specifically: `runtime.txt` (pins Python to 3.11.9) and
+`render.yaml` (a ready-made service blueprint). Both matter because Render's
+newer default Python (3.13/3.14) doesn't have prebuilt wheels yet for pinned
+versions of `numpy`/`faiss-cpu` in `requirements.txt`, which fails the build
+with an error like:
+```
+ERROR: Could not find a version that satisfies the requirement faiss-cpu==1.8.0.post1
+```
+Pinning to 3.11.9 (via `runtime.txt`, or by setting the `PYTHON_VERSION`
+environment variable to `3.11.9` in your host's dashboard) fixes it.
+
+**On Render**, either:
+- Click "New → Blueprint", point it at this repo, and it'll read
+  `render.yaml` automatically, or
+- Create a Web Service manually with:
+  - **Build command:** `pip install -r requirements.txt`
+  - **Start command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+  - **Environment variable:** `PYTHON_VERSION=3.11.9`, plus `LLM_PROVIDER`,
+    `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, etc. from the table below.
+
+On any host, set its environment variables (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`
+/ `OPENAI_API_KEY`, etc. — see table below). Note the public URL you get,
+e.g. `https://rag-backend.onrender.com`.
 
 Also set, on the backend host:
 ```
