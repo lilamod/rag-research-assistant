@@ -14,27 +14,30 @@ they came from.
                                      ┌─────────────────┼─────────────────┐
                                      │                 │                 │
                               document_loader     embeddings        vector_store
-                              (pdf/docx/txt)   (sentence-transformers)  (FAISS)
+                              (pdf/docx/txt)      (Gemini API)          (FAISS)
                                                        │
                                                      llm.py
-                                              (Anthropic / OpenAI)
+                                                    (Gemini)
 ```
 
 ## Features
 
 - **Document ingestion** — PDF, DOCX, TXT, and Markdown, extracted and split
   into overlapping chunks for good retrieval quality.
-- **Local embeddings** — uses `sentence-transformers` on CPU, so no API key
-  or per-document cost is needed just to index files.
+- **Gemini for everything** — one API key powers both chat generation and
+  embeddings (`backend/llm.py`, `backend/embeddings.py`). Free tier, no card
+  required — get a key at https://aistudio.google.com/apikey.
 - **Vector search** — a persistent FAISS index (cosine similarity via
   normalized inner product), saved to disk so your index survives restarts.
 - **Grounded answers with citations** — the LLM is instructed to answer only
-  from retrieved context and cite sources as `[1]`, `[2]`, etc. Pluggable
-  between **Gemini** (default — free, no card required), **Anthropic
-  (Claude)**, and **OpenAI** via one config flag.
+  from retrieved context and cite sources as `[1]`, `[2]`, etc.
 - **Document management** — list and delete ingested documents from the UI.
 - **A real frontend** — a separate React (Vite) single-page app, not a
   backend-rendered template — talking to the API over `fetch`.
+- **Optional local embeddings** — swap to `EMBEDDING_PROVIDER=local`
+  (sentence-transformers, no API calls, no rate limits at any scale) if
+  you're self-hosting on a machine with enough RAM — see
+  [`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md).
 
 ## Project layout
 
@@ -45,9 +48,9 @@ rag-research-assistant/
 │   ├── config.py          # env-driven settings
 │   ├── document_loader.py # pdf/docx/txt/md -> raw text
 │   ├── chunking.py        # recursive text splitter with overlap
-│   ├── embeddings.py      # sentence-transformers wrapper
+│   ├── embeddings.py      # Gemini / local (sentence-transformers) embeddings
 │   ├── vector_store.py    # FAISS index + metadata persistence
-│   ├── llm.py             # Anthropic / OpenAI answer generation
+│   ├── llm.py             # Gemini answer generation
 │   └── rag_pipeline.py    # ties ingestion + retrieval + generation together
 ├── frontend/
 │   ├── src/
@@ -61,8 +64,10 @@ rag-research-assistant/
 ├── data/
 │   ├── uploads/           # raw uploaded files land here
 │   └── index/             # FAISS index + metadata.json (persisted)
-├── requirements.txt
+├── requirements.txt        # full install (includes sentence-transformers/torch for local embeddings)
+├── requirements-cloud.txt  # lightweight install for low-memory hosts (Gemini only, no torch)
 ├── .env.example
+├── Dockerfile / docker-compose.yml / Caddyfile   # for self-hosting (see ORACLE_DEPLOY.md)
 └── run.py                 # `python run.py` to start the backend
 ```
 
@@ -77,7 +82,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env: set LLM_PROVIDER (anthropic|openai) and the matching API key
+# edit .env: set GEMINI_API_KEY (free, no card - https://aistudio.google.com/apikey)
 ```
 
 Start the API:
@@ -116,23 +121,22 @@ python run.py           # FastAPI now also serves the built React app at /
 ## Deploying (frontend on Vercel + backend elsewhere)
 
 Vercel only hosts static sites and serverless functions — it can't run the
-FastAPI backend, its FAISS index, or the local embedding model long-term. So
-the split is:
-
-> **Two backend hosting options are documented here:**
-> - **Render** (below) — quick to set up, free tier has a 512MB RAM cap, so
->   it needs a remote embeddings API (Voyage/OpenAI) instead of local
->   embeddings, and those APIs rate-limit or bill past their free tier.
-> - **Oracle Cloud Always Free VM** (see [`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md)) —
->   more setup work (you manage the VM yourself via Docker), but gives you
->   enough RAM to run local embeddings with zero rate limits and zero
->   per-request cost, at any scale, forever. Better fit if this needs to be
->   reachable 24/7 for other people to use.
+FastAPI backend or its FAISS index long-term. So the split is:
 
 - **Frontend → Vercel** (the `frontend/` folder)
 - **Backend → a regular server host** that can run a long-lived Python
   process, e.g. Render, Railway, Fly.io, an EC2/DigitalOcean box, or a
   container platform.
+
+> **Two backend hosting options are documented here:**
+> - **Render** (below) — quick to set up. Free tier's 512MB RAM can't fit
+>   `sentence-transformers`/torch, so use `requirements-cloud.txt` +
+>   `EMBEDDING_PROVIDER=gemini` (the default) instead of local embeddings.
+> - **Oracle Cloud Always Free VM** (see [`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md)) —
+>   more setup work (you manage the VM yourself via Docker), but gives you
+>   enough RAM to run local embeddings with zero rate limits at any scale.
+>   Chat generation still uses the Gemini API either way — only embeddings
+>   can run fully locally.
 
 ### 1. Deploy the backend first
 
@@ -169,13 +173,13 @@ The env var always wins over the file, so this is the most reliable fix.
 - Create a Web Service manually with:
   - **Build command:** `pip install -r requirements-cloud.txt`
   - **Start command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-  - **Environment variables:** `PYTHON_VERSION=3.11.9`, `LLM_PROVIDER=gemini`,
-    `EMBEDDING_PROVIDER=gemini`, `GEMINI_API_KEY=...` (get one free, no card,
-    at https://aistudio.google.com/apikey), plus `CORS_ORIGINS` from the
+  - **Environment variables:** `PYTHON_VERSION=3.11.9`,
+    `GEMINI_API_KEY=...` (get one free, no card, at
+    https://aistudio.google.com/apikey), plus `CORS_ORIGINS` from the
     table below.
 
-On any host, set its environment variables (`LLM_PROVIDER`, `GEMINI_API_KEY`,
-etc. — see table below). Note the public URL you get, e.g.
+On any host, set its environment variables (`GEMINI_API_KEY`, etc. — see
+table below). Note the public URL you get, e.g.
 `https://rag-backend.onrender.com`.
 
 #### If you hit "Out of memory" or "No open ports detected"
@@ -188,57 +192,30 @@ deploy log shows the build succeeding but then:
 ==> Out of memory (used over 512Mi)
 ==> No open ports detected, continuing to scan...
 ```
-switch to a lightweight remote embeddings provider instead, which has no
-heavy local dependency:
+switch to Gemini embeddings instead, which has no heavy local dependency:
 1. Install from `requirements-cloud.txt` instead of `requirements.txt`
    (build command: `pip install -r requirements-cloud.txt`) — this is
    already what `render.yaml` does.
 2. Set `EMBEDDING_PROVIDER=gemini` and `GEMINI_API_KEY=...` in your host's
-   environment variables (needed even if `LLM_PROVIDER=anthropic` — the two
-   are independent). Gemini is recommended here because it has a genuinely
-   free tier (1,500 requests/day) with **no card required at all** — get a
-   key at https://aistudio.google.com/apikey. `EMBEDDING_PROVIDER=voyage`
-   also works (free tier, 200M tokens, but rate-limited to 3 RPM unless you
-   add a non-charging card), and `EMBEDDING_PROVIDER=openai` works too but
-   has no free quota at all (needs a funded account).
+   environment variables. Gemini has a genuinely free tier (1,500
+   requests/day) with **no card required at all** — get a key at
+   https://aistudio.google.com/apikey.
 3. Redeploy. Memory use drops enormously since no ML runtime needs to load.
 
 If you'd rather keep local embeddings with zero external API calls at all
 (no rate limits, ever, at any scale), you'll need a host with more RAM. See
 [`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md) for a genuinely free-forever option
 (Oracle Cloud Always Free tier) — more setup work than Render, but no
-rate limits or per-request billing at any usage level.
+rate limits or per-request billing on the embeddings side at any usage
+level (chat generation still calls the Gemini API either way).
 
-#### If you hit `voyageai.error.RateLimitError: ... reduced rate limits of 3 RPM`
+#### If you hit a Gemini rate-limit or quota error
 
-This means you're on `EMBEDDING_PROVIDER=voyage` without a payment method on
-file — Voyage throttles free-tier accounts with no card to 3 requests/min.
-Your free 200M tokens still apply either way; adding a card only unlocks
-normal rate limits (Voyage's own docs confirm the free tokens still apply
-after adding one). If you'd rather not add a card anywhere, switch to
-`EMBEDDING_PROVIDER=gemini` instead (see above) — no card needed at all.
-
-#### If you hit `openai.RateLimitError: ... insufficient_quota`
-
-This means your OpenAI account has no billing set up — the OpenAI **API** is
-a separate, pay-as-you-go product from ChatGPT's free web tier, and it isn't
-usable at all without a payment method on file, even for tiny amounts of
-usage. Switch to `EMBEDDING_PROVIDER=gemini` (free, no card — see above), or
-add a few dollars of credit at
-https://platform.openai.com/settings/organization/billing/overview if you'd
-rather keep using OpenAI.
-
-#### If you hit `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`
-
-This is a known break between older `anthropic`/`openai` SDK releases and
-`httpx` 0.28+, which removed a deprecated argument those older SDK versions
-still pass internally. It surfaces the first time the app tries to create an
-Anthropic or OpenAI client — e.g. on your first chat request. Fixed by
-upgrading past the versions that had the bug: `anthropic>=0.40.0` and
-`openai>=1.55.3` (this repo pins `anthropic==0.40.0` and `openai==1.109.1`,
-both well past the fix). If you still see it, you likely have an older
-`requirements.txt`/`requirements-cloud.txt` deployed — redeploy with
-"Clear build cache" so pip actually re-resolves the pinned versions.
+Gemini's free tier (~1,500 requests/day, ~10-15 requests/minute depending on
+the current model and Google's published limits) is generous for a demo or
+small group of users, but a `429`/rate-limit error means you've hit it.
+Options: space requests out, wait for the daily quota to reset, or add
+billing in Google AI Studio to move to paid-tier limits.
 
 Also set, on the backend host:
 ```
@@ -283,19 +260,11 @@ vercel --prod
 
 | Variable          | Default                                       | Notes                                   |
 |--------------------|-----------------------------------------------|------------------------------------------|
-| `LLM_PROVIDER`     | `gemini`                                      | `gemini` (free, no card, recommended), `anthropic`, or `openai` (both paid only) |
-| `GEMINI_API_KEY`   | —                                              | required if `LLM_PROVIDER=gemini` and/or `EMBEDDING_PROVIDER=gemini` (same key covers both) - free at https://aistudio.google.com/apikey, no card needed |
-| `GEMINI_MODEL`     | `gemini-2.5-flash`                            | used when `LLM_PROVIDER=gemini`          |
-| `ANTHROPIC_API_KEY`| —                                              | required if `LLM_PROVIDER=anthropic` (needs a funded Anthropic account - no free API quota) |
-| `ANTHROPIC_MODEL`  | `claude-sonnet-4-6`                           |                                            |
-| `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` (needs a funded OpenAI account - no free API quota) |
-| `OPENAI_MODEL`     | `gpt-4o-mini`                                 |                                            |
-| `EMBEDDING_PROVIDER`| `gemini`                                     | `gemini` (free, no card, recommended), `voyage` (free tier, rate-limited without a card), `openai` (paid only), or `local` (sentence-transformers, needs 1GB+ RAM) |
+| `GEMINI_API_KEY`   | —                                              | required - used for both chat generation and embeddings. Free at https://aistudio.google.com/apikey, no card needed |
+| `GEMINI_MODEL`     | `gemini-2.5-flash`                            | chat generation model                    |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`                  | used when `EMBEDDING_PROVIDER=gemini`    |
+| `EMBEDDING_PROVIDER`| `gemini`                                     | `gemini` (free, no card, default) or `local` (sentence-transformers, needs 1GB+ RAM, no rate limits) |
 | `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |
-| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                | used when `EMBEDDING_PROVIDER=openai`    |
-| `VOYAGE_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=voyage` - free at https://dashboard.voyageai.com |
-| `VOYAGE_EMBEDDING_MODEL` | `voyage-4-lite`                         | used when `EMBEDDING_PROVIDER=voyage`    |
 | `CHUNK_SIZE`       | `1000`                                        | characters per chunk                     |
 | `CHUNK_OVERLAP`    | `150`                                         | characters shared between chunks         |
 | `TOP_K`            | `5`                                           | chunks retrieved per question            |
@@ -318,11 +287,12 @@ vercel --prod
 ## How retrieval + generation works
 
 1. On upload, a file is saved, text is extracted, split into overlapping
-   chunks, embedded locally, and added to the FAISS index with metadata
+   chunks, embedded (Gemini by default, or locally if
+   `EMBEDDING_PROVIDER=local`), and added to the FAISS index with metadata
    (`doc_id`, `filename`).
 2. On a question, the query is embedded with the same model, the FAISS index
    returns the top-k most similar chunks, and those chunks are inserted into
-   a prompt template (`backend/llm.py`) instructing the model to answer only
+   a prompt template (`backend/llm.py`) instructing Gemini to answer only
    from the given context and cite sources by number.
 3. The API returns both the generated answer and the source chunks used, so
    the frontend can show exactly what backed each claim.
@@ -332,9 +302,15 @@ vercel --prod
 - **Swap the vector store** for Chroma, Qdrant, or pgvector by reimplementing
   `vector_store.py`'s small interface (`add`, `search`, `list_documents`,
   `delete_document`).
-- **Add streaming answers** by switching `llm.py` to the providers' streaming
-  APIs and exposing a Server-Sent-Events or WebSocket endpoint.
+- **Add streaming answers** by switching `llm.py` to Gemini's streaming API
+  (`generate_content_stream`) and exposing a Server-Sent-Events or WebSocket
+  endpoint.
 - **Add auth / multi-user support** by namespacing the FAISS index and
   `data/uploads` by user ID.
 - **Re-rank retrieved chunks** with a cross-encoder before generation for
   higher precision on large corpora.
+- **Add another LLM/embedding provider back in** — `backend/llm.py` and
+  `backend/embeddings.py` each have a small, single-purpose interface
+  (`generate_answer()` / `embed_texts()`, `embed_query()`,
+  `embedding_dim()`), so adding a provider back is a self-contained change
+  in one function per file.

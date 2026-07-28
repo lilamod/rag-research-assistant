@@ -1,7 +1,6 @@
 """
-Thin abstraction over LLM providers so the rest of the app doesn't care
-whether we're calling Anthropic, OpenAI, or Gemini. Selected via
-LLM_PROVIDER env var.
+LLM generation via Gemini only. Reuses the same GEMINI_API_KEY used for
+embeddings (see embeddings.py) - one key covers both.
 """
 from typing import List, Dict
 from .config import settings
@@ -38,52 +37,7 @@ def generate_answer(question: str, context_chunks: List[Dict]) -> str:
         )
 
     user_message = _build_user_message(question, context_chunks)
-
-    if settings.LLM_PROVIDER == "anthropic":
-        return _call_anthropic(user_message)
-    elif settings.LLM_PROVIDER == "openai":
-        return _call_openai(user_message)
-    elif settings.LLM_PROVIDER == "gemini":
-        return _call_gemini(user_message)
-    else:
-        raise ValueError(
-            f"Unknown LLM_PROVIDER '{settings.LLM_PROVIDER}'. "
-            "Use 'anthropic', 'openai', or 'gemini'."
-        )
-
-
-def _call_anthropic(user_message: str) -> str:
-    import anthropic
-
-    if not settings.ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
-
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    response = client.messages.create(
-        model=settings.ANTHROPIC_MODEL,
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    return "".join(block.text for block in response.content if block.type == "text")
-
-
-def _call_openai(user_message: str) -> str:
-    from openai import OpenAI
-
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
-
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    response = client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        max_tokens=1024,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-    )
-    return response.choices[0].message.content
+    return _call_gemini(user_message)
 
 
 def _call_gemini(user_message: str) -> str:
@@ -92,9 +46,9 @@ def _call_gemini(user_message: str) -> str:
 
     if not settings.GEMINI_API_KEY:
         raise RuntimeError(
-            "GEMINI_API_KEY is not set. Required for both embeddings and "
-            "generation when LLM_PROVIDER=gemini. Get a free key (no card "
-            "required) at https://aistudio.google.com/apikey"
+            "GEMINI_API_KEY is not set. Required for both chat generation and "
+            "embeddings. Get a free key (no card required) at "
+            "https://aistudio.google.com/apikey"
         )
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)

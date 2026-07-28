@@ -104,7 +104,7 @@ export default function App() {
           <h1>Ask your sources</h1>
           <p>Answers are grounded in the documents on the left, with citations.</p>
         </div>
-        <ChatThread messages={messages} />
+        <ChatThread messages={messages} hasDocuments={documents.length > 0} />
         <Composer onAsk={handleAsk} disabled={asking} />
       </main>
       <Toast message={toast.message} visible={toast.visible} />

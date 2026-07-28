@@ -14,14 +14,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ ./backend/
-COPY run.py .
-
 # Pre-download the embedding model at build time so the first real request
 # isn't slowed down (and so it works even if outbound internet is flaky
-# right after a VM reboot).
+# right after a VM reboot). Done BEFORE copying app code so this layer
+# stays cached across rebuilds that only change backend/ - otherwise every
+# code change would force a slow model re-download too.
 RUN python -c "from sentence_transformers import SentenceTransformer; \
     SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+COPY backend/ ./backend/
+COPY run.py .
 
 RUN mkdir -p data/uploads data/index
 

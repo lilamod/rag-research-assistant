@@ -111,15 +111,18 @@ nano .env
 ```
 Set at minimum:
 ```
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AIzaSy-...
 
 EMBEDDING_PROVIDER=local
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
 CORS_ORIGINS=https://your-app.vercel.app
 ```
-(No `OPENAI_API_KEY` or `VOYAGE_API_KEY` needed at all with local embeddings.)
+(Chat generation always uses Gemini - free, no card, get a key at
+https://aistudio.google.com/apikey. Only the *embeddings* run locally here,
+which is what avoids any rate limit on document indexing/search - chat
+answers still make one Gemini API call per question, same as the Render
+deploy.)
 
 Edit `Caddyfile` and replace the placeholder with your real DuckDNS hostname:
 ```bash

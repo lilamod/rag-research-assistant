@@ -1,70 +1,50 @@
 """
 Splits long documents into overlapping chunks suitable for embedding.
-Uses a recursive splitter that prefers breaking on paragraph/sentence
-boundaries before falling back to hard character cuts.
+Uses a sliding window over the text, snapping each boundary to the nearest
+preceding whitespace where possible (so words aren't split mid-token),
+while still guaranteeing every chunk is <= chunk_size characters.
 """
 from typing import List
-
-SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 
 
 def split_text(
     text: str, chunk_size: int = 1000, chunk_overlap: int = 150
 ) -> List[str]:
     """
-    Recursively split `text` into chunks of ~chunk_size characters,
-    with chunk_overlap characters shared between consecutive chunks.
+    Split `text` into chunks of at most chunk_size characters, with
+    chunk_overlap characters of shared context between consecutive chunks.
     """
     text = text.strip()
     if not text:
         return []
+    if chunk_overlap >= chunk_size:
+        # Prevent an infinite loop / zero forward progress.
+        chunk_overlap = chunk_size // 4
 
-    chunks = _recursive_split(text, chunk_size, SEPARATORS)
-    return _add_overlap(chunks, chunk_overlap, chunk_size)
-
-
-def _recursive_split(text: str, chunk_size: int, separators: List[str]) -> List[str]:
-    if len(text) <= chunk_size:
-        return [text] if text.strip() else []
-
-    separator = separators[0] if separators else ""
-    remaining_separators = separators[1:] if len(separators) > 1 else []
-
-    if separator == "":
-        # Hard cut as last resort
-        return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-
-    parts = text.split(separator)
     chunks: List[str] = []
-    current = ""
+    start = 0
+    text_len = len(text)
 
-    for part in parts:
-        candidate = (current + separator + part) if current else part
-        if len(candidate) <= chunk_size:
-            current = candidate
-        else:
-            if current:
-                chunks.append(current)
-            if len(part) > chunk_size:
-                chunks.extend(_recursive_split(part, chunk_size, remaining_separators))
-                current = ""
-            else:
-                current = part
+    while start < text_len:
+        end = min(start + chunk_size, text_len)
 
-    if current:
-        chunks.append(current)
+        # If we're not at the very end of the text, try to snap the cut
+        # point back to the last whitespace so we don't split mid-word.
+        if end < text_len:
+            snap = text.rfind(" ", start, end)
+            if snap > start:
+                end = snap
 
-    return [c for c in chunks if c.strip()]
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
 
+        if end >= text_len:
+            break
 
-def _add_overlap(chunks: List[str], overlap: int, chunk_size: int) -> List[str]:
-    if overlap <= 0 or len(chunks) <= 1:
-        return chunks
+        # Advance by a full window minus the overlap, guaranteeing forward
+        # progress even when `end` got snapped back by whitespace.
+        next_start = end - chunk_overlap
+        start = next_start if next_start > start else end
 
-    overlapped = [chunks[0]]
-    for i in range(1, len(chunks)):
-        prev_tail = chunks[i - 1][-overlap:]
-        merged = (prev_tail + " " + chunks[i]).strip()
-        # Guard against runaway growth if overlap is large relative to chunk_size
-        overlapped.append(merged[: chunk_size + overlap])
-    return overlapped
+    return chunks

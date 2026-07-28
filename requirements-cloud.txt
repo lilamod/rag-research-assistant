@@ -1,13 +1,8 @@
 # Lightweight backend dependencies for low-memory hosts (e.g. Render free tier,
 # 512MB RAM). Excludes sentence-transformers/torch, which alone need 1GB+ RAM
-# just to import, and excludes the anthropic/openai/voyage SDKs since this
-# deployment uses Gemini for both chat generation and embeddings (genuinely
-# free, no card required - get a key at https://aistudio.google.com/apikey).
-#
-# If you want to use Anthropic/OpenAI/Voyage instead, add the relevant
-# package back in (see requirements.txt for the full list) - the code in
-# backend/llm.py and backend/embeddings.py already supports all of them,
-# selected via LLM_PROVIDER / EMBEDDING_PROVIDER env vars.
+# just to import - this deployment uses Gemini for both chat generation and
+# embeddings (genuinely free, no card required - get a key at
+# https://aistudio.google.com/apikey).
 #
 # Install with: pip install -r requirements-cloud.txt
 fastapi==0.115.0

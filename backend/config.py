@@ -12,50 +12,26 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 
 class Settings:
-    # LLM
-    # "gemini"    -> Google's Gemini API for chat generation too, not just
-    #                embeddings. Reuses the same GEMINI_API_KEY. Genuinely
-    #                free tier (no card), good default if you want a single
-    #                provider for everything.
-    # "anthropic" -> Claude, needs a funded Anthropic account (no free
-    #                API quota).
-    # "openai"    -> needs a funded OpenAI account (no free API quota).
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower()
+    # LLM (chat generation) - Gemini only. Free tier, no card required -
+    # get a key at https://aistudio.google.com/apikey
+    LLM_PROVIDER: str = "gemini"
 
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # Embeddings
-    # "local"  -> sentence-transformers, runs on CPU, no API key, but pulls in
-    #             torch (heavy: needs 1GB+ RAM, unsuitable for small hosts).
-    # "gemini" -> Google's Gemini embeddings API, lightweight install, needs
-    #             GEMINI_API_KEY. Genuinely free tier (1,500 requests/day),
-    #             no card required - get a key at
-    #             https://aistudio.google.com/apikey. Default recommendation.
-    # "openai" -> OpenAI's embeddings API, lightweight install, needs
-    #             OPENAI_API_KEY (independent of LLM_PROVIDER for generation).
-    #             No free quota - needs a funded OpenAI account.
-    # "voyage" -> Voyage AI's embeddings API, lightweight install, needs
-    #             VOYAGE_API_KEY. Free tier (200M tokens) exists but is
-    #             capped at 3 RPM until you add a (non-charging) card.
+    # "gemini" -> Google's Gemini embeddings API, lightweight install, same
+    #             GEMINI_API_KEY as above. Genuinely free tier (1,500
+    #             requests/day), no card required. Default.
+    # "local"  -> sentence-transformers, runs on CPU, no API key, no rate
+    #             limits at any scale, but pulls in torch (heavy: needs
+    #             1GB+ RAM). Too heavy for small free-tier hosts, but the
+    #             right choice for a self-hosted VM with RAM to spare
+    #             (see ORACLE_DEPLOY.md).
     EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "gemini").lower()
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
-    OPENAI_EMBEDDING_MODEL: str = os.getenv(
-        "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
-    )
-    OPENAI_EMBEDDING_DIM: int = int(os.getenv("OPENAI_EMBEDDING_DIM", "1536"))
-
-    VOYAGE_API_KEY: str = os.getenv("VOYAGE_API_KEY", "")
-    VOYAGE_EMBEDDING_MODEL: str = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-4-lite")
-    VOYAGE_EMBEDDING_DIM: int = int(os.getenv("VOYAGE_EMBEDDING_DIM", "1024"))
-
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GEMINI_EMBEDDING_MODEL: str = os.getenv(
         "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
     )
