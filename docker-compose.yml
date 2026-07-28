@@ -1,0 +1,47 @@
+# Self-hosting stack for a free-forever VM (e.g. Oracle Cloud Always Free).
+#
+# Two services:
+#   backend - the FastAPI app, built from the local Dockerfile.
+#   caddy   - reverse proxy that automatically gets + renews a free
+#             Let's Encrypt HTTPS certificate for your domain, and forwards
+#             traffic to the backend. This is what makes https://yourdomain
+#             work without you touching certbot/nginx config by hand.
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in your real values (API keys,
+#      CORS_ORIGINS set to your Vercel frontend URL).
+#   2. Edit Caddyfile: replace "yourdomain.duckdns.org" with your actual
+#      domain/subdomain (see the Oracle deployment guide in README.md).
+#   3. docker compose up -d --build
+#
+# Both containers restart automatically on crash or VM reboot
+# (restart: unless-stopped), so once this is running you shouldn't need to
+# touch it again.
+
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data   # persist uploaded docs + FAISS index across restarts
+    expose:
+      - "8000"             # only reachable from other containers (via Caddy)
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # required for Let's Encrypt's HTTP-01 challenge
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data       # persists issued certs across restarts
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

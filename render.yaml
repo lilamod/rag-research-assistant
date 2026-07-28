@@ -15,14 +15,14 @@ services:
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-4-6
       # Free-tier hosts (512MB RAM) can't fit torch/sentence-transformers,
-      # so embeddings run through Voyage AI's API instead of the local
-      # model. Voyage has a genuine free tier (200M tokens), so this
-      # needs a VOYAGE_API_KEY but no billing setup, unlike OpenAI's API.
+      # so embeddings run through Gemini's API instead of the local model.
+      # Gemini has a genuinely free tier (1,500 requests/day) with no card
+      # required at all - get a key at https://aistudio.google.com/apikey.
       - key: EMBEDDING_PROVIDER
-        value: voyage
-      - key: VOYAGE_API_KEY
+        value: gemini
+      - key: GEMINI_API_KEY
         sync: false
-      - key: VOYAGE_EMBEDDING_MODEL
-        value: voyage-4-lite
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001
       - key: CORS_ORIGINS
         value: "*"

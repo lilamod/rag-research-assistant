@@ -1,0 +1,10 @@
+# Replace this with your actual domain/subdomain, e.g. from DuckDNS:
+#   myragapp.duckdns.org
+#
+# Caddy automatically requests and renews a free Let's Encrypt certificate
+# for whatever domain you put here, and proxies all traffic to the backend
+# container over plain HTTP internally (safe, since that hop never leaves
+# the VM).
+yourdomain.duckdns.org {
+    reverse_proxy backend:8000
+}

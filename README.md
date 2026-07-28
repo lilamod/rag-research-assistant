@@ -118,6 +118,16 @@ Vercel only hosts static sites and serverless functions — it can't run the
 FastAPI backend, its FAISS index, or the local embedding model long-term. So
 the split is:
 
+> **Two backend hosting options are documented here:**
+> - **Render** (below) — quick to set up, free tier has a 512MB RAM cap, so
+>   it needs a remote embeddings API (Voyage/OpenAI) instead of local
+>   embeddings, and those APIs rate-limit or bill past their free tier.
+> - **Oracle Cloud Always Free VM** (see [`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md)) —
+>   more setup work (you manage the VM yourself via Docker), but gives you
+>   enough RAM to run local embeddings with zero rate limits and zero
+>   per-request cost, at any scale, forever. Better fit if this needs to be
+>   reachable 24/7 for other people to use.
+
 - **Frontend → Vercel** (the `frontend/` folder)
 - **Backend → a regular server host** that can run a long-lived Python
   process, e.g. Render, Railway, Fly.io, an EC2/DigitalOcean box, or a
@@ -178,28 +188,40 @@ heavy local dependency:
 1. Install from `requirements-cloud.txt` instead of `requirements.txt`
    (build command: `pip install -r requirements-cloud.txt`) — this is
    already what `render.yaml` does.
-2. Set `EMBEDDING_PROVIDER=voyage` and `VOYAGE_API_KEY=...` in your host's
+2. Set `EMBEDDING_PROVIDER=gemini` and `GEMINI_API_KEY=...` in your host's
    environment variables (needed even if `LLM_PROVIDER=anthropic` — the two
-   are independent). Voyage AI is recommended here because it has a genuine
-   free tier (200M tokens on current models, no card required) — sign up at
-   https://dashboard.voyageai.com. `EMBEDDING_PROVIDER=openai` also works if
-   you'd rather use OpenAI, but its embeddings API has no free quota; it
-   needs a funded account (see the next troubleshooting entry below for a
-   related pitfall).
+   are independent). Gemini is recommended here because it has a genuinely
+   free tier (1,500 requests/day) with **no card required at all** — get a
+   key at https://aistudio.google.com/apikey. `EMBEDDING_PROVIDER=voyage`
+   also works (free tier, 200M tokens, but rate-limited to 3 RPM unless you
+   add a non-charging card), and `EMBEDDING_PROVIDER=openai` works too but
+   has no free quota at all (needs a funded account).
 3. Redeploy. Memory use drops enormously since no ML runtime needs to load.
 
-If you'd rather keep local embeddings, you'll need a host/plan with at least
-~1–2GB RAM (Render's paid plans, Railway, Fly.io with a bigger machine, etc.).
+If you'd rather keep local embeddings with zero external API calls at all
+(no rate limits, ever, at any scale), you'll need a host with more RAM. See
+[`ORACLE_DEPLOY.md`](./ORACLE_DEPLOY.md) for a genuinely free-forever option
+(Oracle Cloud Always Free tier) — more setup work than Render, but no
+rate limits or per-request billing at any usage level.
+
+#### If you hit `voyageai.error.RateLimitError: ... reduced rate limits of 3 RPM`
+
+This means you're on `EMBEDDING_PROVIDER=voyage` without a payment method on
+file — Voyage throttles free-tier accounts with no card to 3 requests/min.
+Your free 200M tokens still apply either way; adding a card only unlocks
+normal rate limits (Voyage's own docs confirm the free tokens still apply
+after adding one). If you'd rather not add a card anywhere, switch to
+`EMBEDDING_PROVIDER=gemini` instead (see above) — no card needed at all.
 
 #### If you hit `openai.RateLimitError: ... insufficient_quota`
 
 This means your OpenAI account has no billing set up — the OpenAI **API** is
 a separate, pay-as-you-go product from ChatGPT's free web tier, and it isn't
 usable at all without a payment method on file, even for tiny amounts of
-usage. Either add a few dollars of credit at
-https://platform.openai.com/settings/organization/billing/overview, or
-switch to `EMBEDDING_PROVIDER=voyage` (see above), which has an actual free
-tier and needs no billing information to get started.
+usage. Switch to `EMBEDDING_PROVIDER=gemini` (free, no card — see above), or
+add a few dollars of credit at
+https://platform.openai.com/settings/organization/billing/overview if you'd
+rather keep using OpenAI.
 
 #### If you hit `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`
 
@@ -261,11 +283,13 @@ vercel --prod
 | `ANTHROPIC_MODEL`  | `claude-sonnet-4-6`                           |                                            |
 | `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` (needs a funded OpenAI account - no free API quota) |
 | `OPENAI_MODEL`     | `gpt-4o-mini`                                 |                                            |
-| `EMBEDDING_PROVIDER`| `voyage`                                     | `voyage` (free tier, recommended), `openai` (paid only), or `local` (sentence-transformers, needs 1GB+ RAM) |
+| `EMBEDDING_PROVIDER`| `gemini`                                     | `gemini` (free, no card, recommended), `voyage` (free tier, rate-limited without a card), `openai` (paid only), or `local` (sentence-transformers, needs 1GB+ RAM) |
 | `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                | used when `EMBEDDING_PROVIDER=openai`    |
 | `VOYAGE_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=voyage` - free at https://dashboard.voyageai.com |
 | `VOYAGE_EMBEDDING_MODEL` | `voyage-4-lite`                         | used when `EMBEDDING_PROVIDER=voyage`    |
+| `GEMINI_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=gemini` - free at https://aistudio.google.com/apikey, no card needed |
+| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`                  | used when `EMBEDDING_PROVIDER=gemini`    |
 | `CHUNK_SIZE`       | `1000`                                        | characters per chunk                     |
 | `CHUNK_OVERLAP`    | `150`                                         | characters shared between chunks         |
 | `TOP_K`            | `5`                                           | chunks retrieved per question            |

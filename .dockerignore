@@ -1,0 +1,12 @@
+frontend/
+data/uploads/*
+data/index/*
+!data/uploads/.gitkeep
+!data/index/.gitkeep
+.env
+.git/
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/

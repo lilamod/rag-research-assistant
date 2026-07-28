@@ -4,14 +4,17 @@ Embedding backend, selectable via EMBEDDING_PROVIDER:
   "local"  - sentence-transformers, runs on CPU, no API key needed.
              Pulls in torch, so it needs real RAM (~1GB+) -- fine on a
              laptop or a proper VM, too heavy for many free-tier hosts.
+  "gemini" - Google's Gemini embeddings API. Lightweight install (no
+             torch). Needs GEMINI_API_KEY. Genuinely free tier (1,500
+             requests/day), no card required -- get a key at
+             https://aistudio.google.com/apikey. Default recommendation
+             for low-memory hosts.
   "openai" - OpenAI's embeddings API. Lightweight install (no torch),
              good fit for small/low-memory hosts. Needs OPENAI_API_KEY
              and a funded OpenAI account (no free API quota).
   "voyage" - Voyage AI's embeddings API. Lightweight install (no torch).
-             Needs VOYAGE_API_KEY. Comes with a genuinely free tier
-             (200M tokens on the current model generation, no card
-             required to start) -- good default for low-memory hosts
-             where you don't want to pay for embeddings.
+             Needs VOYAGE_API_KEY. Free tier (200M tokens) exists but is
+             rate-limited to 3 RPM until you add a (non-charging) card.
 
 All paths expose the same interface: embed_texts(), embed_query(),
 embedding_dim().
@@ -108,13 +111,53 @@ def _voyage_dim() -> int:
 
 
 # ---------------------------------------------------------------------------
+# Gemini backend
+# ---------------------------------------------------------------------------
+@lru_cache(maxsize=1)
+def _get_gemini_client():
+    from google import genai
+
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set. Required when EMBEDDING_PROVIDER=gemini. "
+            "Get a free key at https://aistudio.google.com/apikey"
+        )
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
+def _embed_gemini(texts: List[str], task_type: str) -> np.ndarray:
+    from google.genai import types
+
+    client = _get_gemini_client()
+    response = client.models.embed_content(
+        model=settings.GEMINI_EMBEDDING_MODEL,
+        contents=texts,
+        config=types.EmbedContentConfig(
+            taskType=task_type,
+            outputDimensionality=settings.GEMINI_EMBEDDING_DIM,
+        ),
+    )
+    vectors = np.array([e.values for e in response.embeddings], dtype="float32")
+    # Gemini only pre-normalizes the full 3072-dim output; anything truncated
+    # via outputDimensionality needs manual L2 normalization to stay
+    # comparable via inner-product search, same as our other providers.
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return vectors / norms
+
+
+def _gemini_dim() -> int:
+    return settings.GEMINI_EMBEDDING_DIM
+
+
+# ---------------------------------------------------------------------------
 # Public interface
 # ---------------------------------------------------------------------------
 def embed_texts(texts: List[str], is_query: bool = False) -> np.ndarray:
     """Embed a list of strings. Returns a (n, dim) float32 numpy array, L2-normalized.
 
-    `is_query` matters only for providers (like Voyage) that distinguish
-    query vs. document embeddings for better retrieval quality.
+    `is_query` matters only for providers (like Voyage and Gemini) that
+    distinguish query vs. document embeddings for better retrieval quality.
     """
     if not texts:
         return np.zeros((0, embedding_dim()), dtype="float32")
@@ -125,10 +168,14 @@ def embed_texts(texts: List[str], is_query: bool = False) -> np.ndarray:
         return _embed_openai(texts)
     elif settings.EMBEDDING_PROVIDER == "voyage":
         return _embed_voyage(texts, input_type="query" if is_query else "document")
+    elif settings.EMBEDDING_PROVIDER == "gemini":
+        return _embed_gemini(
+            texts, task_type="RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
+        )
     else:
         raise ValueError(
             f"Unknown EMBEDDING_PROVIDER '{settings.EMBEDDING_PROVIDER}'. "
-            "Use 'local', 'openai', or 'voyage'."
+            "Use 'local', 'gemini', 'openai', or 'voyage'."
         )
 
 
@@ -143,8 +190,10 @@ def embedding_dim() -> int:
         return _openai_dim()
     elif settings.EMBEDDING_PROVIDER == "voyage":
         return _voyage_dim()
+    elif settings.EMBEDDING_PROVIDER == "gemini":
+        return _gemini_dim()
     else:
         raise ValueError(
             f"Unknown EMBEDDING_PROVIDER '{settings.EMBEDDING_PROVIDER}'. "
-            "Use 'local', 'openai', or 'voyage'."
+            "Use 'local', 'gemini', 'openai', or 'voyage'."
         )

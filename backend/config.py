@@ -24,13 +24,17 @@ class Settings:
     # Embeddings
     # "local"  -> sentence-transformers, runs on CPU, no API key, but pulls in
     #             torch (heavy: needs 1GB+ RAM, unsuitable for small hosts).
+    # "gemini" -> Google's Gemini embeddings API, lightweight install, needs
+    #             GEMINI_API_KEY. Genuinely free tier (1,500 requests/day),
+    #             no card required - get a key at
+    #             https://aistudio.google.com/apikey. Default recommendation.
     # "openai" -> OpenAI's embeddings API, lightweight install, needs
     #             OPENAI_API_KEY (independent of LLM_PROVIDER for generation).
     #             No free quota - needs a funded OpenAI account.
     # "voyage" -> Voyage AI's embeddings API, lightweight install, needs
-    #             VOYAGE_API_KEY. Comes with a genuine free tier (200M
-    #             tokens on current models) - good low-memory-host default.
-    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "voyage").lower()
+    #             VOYAGE_API_KEY. Free tier (200M tokens) exists but is
+    #             capped at 3 RPM until you add a (non-charging) card.
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "gemini").lower()
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
@@ -42,6 +46,12 @@ class Settings:
     VOYAGE_API_KEY: str = os.getenv("VOYAGE_API_KEY", "")
     VOYAGE_EMBEDDING_MODEL: str = os.getenv("VOYAGE_EMBEDDING_MODEL", "voyage-4-lite")
     VOYAGE_EMBEDDING_DIM: int = int(os.getenv("VOYAGE_EMBEDDING_DIM", "1024"))
+
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_EMBEDDING_MODEL: str = os.getenv(
+        "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
+    )
+    GEMINI_EMBEDDING_DIM: int = int(os.getenv("GEMINI_EMBEDDING_DIM", "768"))
 
     # Chunking
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "1000"))
