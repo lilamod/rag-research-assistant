@@ -13,7 +13,14 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 class Settings:
     # LLM
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic").lower()
+    # "gemini"    -> Google's Gemini API for chat generation too, not just
+    #                embeddings. Reuses the same GEMINI_API_KEY. Genuinely
+    #                free tier (no card), good default if you want a single
+    #                provider for everything.
+    # "anthropic" -> Claude, needs a funded Anthropic account (no free
+    #                API quota).
+    # "openai"    -> needs a funded OpenAI account (no free API quota).
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower()
 
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
@@ -48,6 +55,7 @@ class Settings:
     VOYAGE_EMBEDDING_DIM: int = int(os.getenv("VOYAGE_EMBEDDING_DIM", "1024"))
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GEMINI_EMBEDDING_MODEL: str = os.getenv(
         "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
     )

@@ -1,6 +1,7 @@
 """
 Thin abstraction over LLM providers so the rest of the app doesn't care
-whether we're calling Anthropic or OpenAI. Selected via LLM_PROVIDER env var.
+whether we're calling Anthropic, OpenAI, or Gemini. Selected via
+LLM_PROVIDER env var.
 """
 from typing import List, Dict
 from .config import settings
@@ -42,9 +43,12 @@ def generate_answer(question: str, context_chunks: List[Dict]) -> str:
         return _call_anthropic(user_message)
     elif settings.LLM_PROVIDER == "openai":
         return _call_openai(user_message)
+    elif settings.LLM_PROVIDER == "gemini":
+        return _call_gemini(user_message)
     else:
         raise ValueError(
-            f"Unknown LLM_PROVIDER '{settings.LLM_PROVIDER}'. Use 'anthropic' or 'openai'."
+            f"Unknown LLM_PROVIDER '{settings.LLM_PROVIDER}'. "
+            "Use 'anthropic', 'openai', or 'gemini'."
         )
 
 
@@ -80,3 +84,26 @@ def _call_openai(user_message: str) -> str:
         ],
     )
     return response.choices[0].message.content
+
+
+def _call_gemini(user_message: str) -> str:
+    from google import genai
+    from google.genai import types
+
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set. Required for both embeddings and "
+            "generation when LLM_PROVIDER=gemini. Get a free key (no card "
+            "required) at https://aistudio.google.com/apikey"
+        )
+
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model=settings.GEMINI_MODEL,
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            max_output_tokens=1024,
+        ),
+    )
+    return response.text

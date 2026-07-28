@@ -30,7 +30,8 @@ they came from.
   normalized inner product), saved to disk so your index survives restarts.
 - **Grounded answers with citations** — the LLM is instructed to answer only
   from retrieved context and cite sources as `[1]`, `[2]`, etc. Pluggable
-  between **Anthropic (Claude)** and **OpenAI** via one config flag.
+  between **Gemini** (default — free, no card required), **Anthropic
+  (Claude)**, and **OpenAI** via one config flag.
 - **Document management** — list and delete ingested documents from the UI.
 - **A real frontend** — a separate React (Vite) single-page app, not a
   backend-rendered template — talking to the API over `fetch`.
@@ -162,16 +163,20 @@ The env var always wins over the file, so this is the most reliable fix.
 
 **On Render**, either:
 - Click "New → Blueprint", point it at this repo, and it'll read
-  `render.yaml` automatically (which also sets `PYTHON_VERSION`), or
+  `render.yaml` automatically (which also sets `PYTHON_VERSION` and defaults
+  to Gemini for both chat and embeddings — just add your `GEMINI_API_KEY`),
+  or
 - Create a Web Service manually with:
-  - **Build command:** `pip install -r requirements.txt`
+  - **Build command:** `pip install -r requirements-cloud.txt`
   - **Start command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-  - **Environment variable:** `PYTHON_VERSION=3.11.9`, plus `LLM_PROVIDER`,
-    `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, etc. from the table below.
+  - **Environment variables:** `PYTHON_VERSION=3.11.9`, `LLM_PROVIDER=gemini`,
+    `EMBEDDING_PROVIDER=gemini`, `GEMINI_API_KEY=...` (get one free, no card,
+    at https://aistudio.google.com/apikey), plus `CORS_ORIGINS` from the
+    table below.
 
-On any host, set its environment variables (`LLM_PROVIDER`, `ANTHROPIC_API_KEY`
-/ `OPENAI_API_KEY`, etc. — see table below). Note the public URL you get,
-e.g. `https://rag-backend.onrender.com`.
+On any host, set its environment variables (`LLM_PROVIDER`, `GEMINI_API_KEY`,
+etc. — see table below). Note the public URL you get, e.g.
+`https://rag-backend.onrender.com`.
 
 #### If you hit "Out of memory" or "No open ports detected"
 
@@ -278,18 +283,19 @@ vercel --prod
 
 | Variable          | Default                                       | Notes                                   |
 |--------------------|-----------------------------------------------|------------------------------------------|
-| `LLM_PROVIDER`     | `anthropic`                                   | `anthropic` or `openai`                  |
-| `ANTHROPIC_API_KEY`| —                                              | required if provider is `anthropic`      |
+| `LLM_PROVIDER`     | `gemini`                                      | `gemini` (free, no card, recommended), `anthropic`, or `openai` (both paid only) |
+| `GEMINI_API_KEY`   | —                                              | required if `LLM_PROVIDER=gemini` and/or `EMBEDDING_PROVIDER=gemini` (same key covers both) - free at https://aistudio.google.com/apikey, no card needed |
+| `GEMINI_MODEL`     | `gemini-2.5-flash`                            | used when `LLM_PROVIDER=gemini`          |
+| `ANTHROPIC_API_KEY`| —                                              | required if `LLM_PROVIDER=anthropic` (needs a funded Anthropic account - no free API quota) |
 | `ANTHROPIC_MODEL`  | `claude-sonnet-4-6`                           |                                            |
 | `OPENAI_API_KEY`   | —                                              | required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` (needs a funded OpenAI account - no free API quota) |
 | `OPENAI_MODEL`     | `gpt-4o-mini`                                 |                                            |
 | `EMBEDDING_PROVIDER`| `gemini`                                     | `gemini` (free, no card, recommended), `voyage` (free tier, rate-limited without a card), `openai` (paid only), or `local` (sentence-transformers, needs 1GB+ RAM) |
+| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`                  | used when `EMBEDDING_PROVIDER=gemini`    |
 | `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                | used when `EMBEDDING_PROVIDER=openai`    |
 | `VOYAGE_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=voyage` - free at https://dashboard.voyageai.com |
 | `VOYAGE_EMBEDDING_MODEL` | `voyage-4-lite`                         | used when `EMBEDDING_PROVIDER=voyage`    |
-| `GEMINI_API_KEY`   | —                                              | required if `EMBEDDING_PROVIDER=gemini` - free at https://aistudio.google.com/apikey, no card needed |
-| `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`                  | used when `EMBEDDING_PROVIDER=gemini`    |
 | `CHUNK_SIZE`       | `1000`                                        | characters per chunk                     |
 | `CHUNK_OVERLAP`    | `150`                                         | characters shared between chunks         |
 | `TOP_K`            | `5`                                           | chunks retrieved per question            |
