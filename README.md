@@ -261,7 +261,7 @@ vercel --prod
 | Variable          | Default                                       | Notes                                   |
 |--------------------|-----------------------------------------------|------------------------------------------|
 | `GEMINI_API_KEY`   | —                                              | required - used for both chat generation and embeddings. Free at https://aistudio.google.com/apikey, no card needed |
-| `GEMINI_MODEL`     | `gemini-2.5-flash`                            | chat generation model                    |
+| `GEMINI_MODEL`     | `gemini-3.6-flash`                            | chat generation model                    |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`                  | used when `EMBEDDING_PROVIDER=gemini`    |
 | `EMBEDDING_PROVIDER`| `gemini`                                     | `gemini` (free, no card, default) or `local` (sentence-transformers, needs 1GB+ RAM, no rate limits) |
 | `EMBEDDING_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2`      | used when `EMBEDDING_PROVIDER=local`     |

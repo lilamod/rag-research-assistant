@@ -52,12 +52,22 @@ def _call_gemini(user_message: str) -> str:
         )
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    response = client.models.generate_content(
-        model=settings.GEMINI_MODEL,
-        contents=user_message,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            max_output_tokens=1024,
-        ),
-    )
-    return response.text
+    try:
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                max_output_tokens=1024,
+            ),
+        )
+        return response.text
+    except Exception as exc:
+        error_msg = str(exc)
+        if "404" in error_msg or "is no longer available" in error_msg:
+            raise RuntimeError(
+                f"Gemini model '{settings.GEMINI_MODEL}' is no longer available. "
+                "Update the GEMINI_MODEL environment variable to a supported model "
+                "(e.g. 'gemini-3.6-flash')."
+            ) from exc
+        raise
