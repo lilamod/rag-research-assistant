@@ -11,6 +11,7 @@ Endpoints:
 
 Also serves the static frontend at /.
 """
+import json
 import shutil
 import uuid
 from pathlib import Path
@@ -18,6 +19,7 @@ from typing import List
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -109,6 +111,25 @@ def chat(request: ChatRequest):
         # e.g. missing API key
         raise HTTPException(status_code=500, detail=str(e))
     return result
+
+
+@app.post("/api/chat/stream")
+def chat_stream(request: ChatRequest):
+    if not request.question or not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question must not be empty.")
+
+    def event_generator():
+        try:
+            for event_type, payload in rag_pipeline.answer_question_stream(
+                request.question, top_k=request.top_k
+            ):
+                yield f"data: {json.dumps({'type': event_type, event_type: payload})}\n\n"
+        except RuntimeError as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Unexpected error: {e}'})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # In production, serve the built React app (frontend/dist) at the root path.

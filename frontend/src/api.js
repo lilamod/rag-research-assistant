@@ -52,3 +52,51 @@ export async function askQuestion(question, topK) {
   })
   return handle(res)
 }
+
+export async function askQuestionStream(question, topK, { onToken, onSources, onError }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, top_k: topK ?? null }),
+    })
+
+    if (!res.ok) {
+      let detail = `Request failed (${res.status})`
+      try { const d = await res.json(); detail = d.detail || detail } catch {}
+      onError(detail)
+      return
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''  // keep partial line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const data = JSON.parse(line.slice(6))
+          if (data.type === 'token') {
+            onToken(data.token)
+          } else if (data.type === 'sources') {
+            onSources(data.sources)
+          } else if (data.type === 'error') {
+            onError(data.message)
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  } catch (err) {
+    onError(err.message || 'Connection failed')
+  }
+}

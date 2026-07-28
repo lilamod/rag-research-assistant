@@ -2,7 +2,8 @@
 LLM generation via Gemini only. Reuses the same GEMINI_API_KEY used for
 embeddings (see embeddings.py) - one key covers both.
 """
-from typing import List, Dict
+from functools import lru_cache
+from typing import List, Dict, Generator
 from .config import settings
 
 SYSTEM_PROMPT = """You are a careful research assistant. Answer the user's question \
@@ -29,6 +30,19 @@ def _build_user_message(question: str, context_chunks: List[Dict]) -> str:
     )
 
 
+@lru_cache(maxsize=1)
+def _get_llm_client():
+    from google import genai
+
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set. Required for both chat generation and "
+            "embeddings. Get a free key (no card required) at "
+            "https://aistudio.google.com/apikey"
+        )
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
 def generate_answer(question: str, context_chunks: List[Dict]) -> str:
     if not context_chunks:
         return (
@@ -40,18 +54,23 @@ def generate_answer(question: str, context_chunks: List[Dict]) -> str:
     return _call_gemini(user_message)
 
 
+def generate_answer_stream(question: str, context_chunks: List[Dict]) -> Generator[str, None, None]:
+    """Yield answer tokens one at a time from the Gemini streaming API."""
+    if not context_chunks:
+        yield (
+            "I couldn't find any relevant documents to answer that question. "
+            "Try uploading source material first, or rephrase your question."
+        )
+        return
+
+    user_message = _build_user_message(question, context_chunks)
+    yield from _call_gemini_stream(user_message)
+
+
 def _call_gemini(user_message: str) -> str:
-    from google import genai
     from google.genai import types
 
-    if not settings.GEMINI_API_KEY:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set. Required for both chat generation and "
-            "embeddings. Get a free key (no card required) at "
-            "https://aistudio.google.com/apikey"
-        )
-
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = _get_llm_client()
     try:
         response = client.models.generate_content(
             model=settings.GEMINI_MODEL,
@@ -62,6 +81,32 @@ def _call_gemini(user_message: str) -> str:
             ),
         )
         return response.text
+    except Exception as exc:
+        error_msg = str(exc)
+        if "404" in error_msg or "is no longer available" in error_msg:
+            raise RuntimeError(
+                f"Gemini model '{settings.GEMINI_MODEL}' is no longer available. "
+                "Update the GEMINI_MODEL environment variable to a supported model "
+                "(e.g. 'gemini-3.6-flash')."
+            ) from exc
+        raise
+
+
+def _call_gemini_stream(user_message: str) -> Generator[str, None, None]:
+    from google.genai import types
+
+    client = _get_llm_client()
+    try:
+        for chunk in client.models.generate_content_stream(
+            model=settings.GEMINI_MODEL,
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                max_output_tokens=1024,
+            ),
+        ):
+            if chunk.text:
+                yield chunk.text
     except Exception as exc:
         error_msg = str(exc)
         if "404" in error_msg or "is no longer available" in error_msg:

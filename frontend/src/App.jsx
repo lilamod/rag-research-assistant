@@ -3,7 +3,7 @@ import Sidebar from './components/Sidebar.jsx'
 import ChatThread from './components/ChatThread.jsx'
 import Composer from './components/Composer.jsx'
 import Toast from './components/Toast.jsx'
-import { askQuestion, deleteDocument, getStats, listDocuments, uploadFiles } from './api.js'
+import { askQuestionStream, deleteDocument, getStats, listDocuments, uploadFiles } from './api.js'
 
 let nextId = 1
 const makeId = () => nextId++
@@ -65,30 +65,60 @@ export default function App() {
 
   async function handleAsk(question) {
     const userMsg = { id: makeId(), role: 'user', content: question }
-    const thinkingMsg = { id: makeId(), role: 'assistant', content: 'Searching sources and drafting an answer…', status: 'thinking' }
+    const thinkingMsg = { id: makeId(), role: 'assistant', content: 'Searching sources…', status: 'thinking' }
     setMessages((prev) => [...prev, userMsg, thinkingMsg])
     setAsking(true)
 
-    try {
-      const data = await askQuestion(question)
+    let buffer = ''
+    let errored = false
+
+    await askQuestionStream(question, null, {
+      onToken(token) {
+        if (buffer === '') {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === thinkingMsg.id ? { ...m, content: '', status: 'thinking' } : m
+            )
+          )
+        }
+        buffer += token
+        if (buffer.length % 3 === 0 || token.includes('\n')) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === thinkingMsg.id ? { ...m, content: buffer } : m
+            )
+          )
+        }
+      },
+      onSources(sources) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === thinkingMsg.id
+              ? { ...m, content: buffer, sources, status: undefined }
+              : m
+          )
+        )
+      },
+      onError(message) {
+        errored = true
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === thinkingMsg.id
+              ? { ...m, content: message || 'Something went wrong.', status: 'error' }
+              : m
+          )
+        )
+      },
+    })
+
+    if (!errored) {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === thinkingMsg.id
-            ? { ...m, content: data.answer, sources: data.sources, status: undefined }
-            : m
+          m.id === thinkingMsg.id ? { ...m, content: buffer } : m
         )
       )
-    } catch (err) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === thinkingMsg.id
-            ? { ...m, content: err.message || 'Something went wrong.', status: 'error' }
-            : m
-        )
-      )
-    } finally {
-      setAsking(false)
     }
+    setAsking(false)
   }
 
   return (
