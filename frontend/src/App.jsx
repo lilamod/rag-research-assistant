@@ -3,7 +3,15 @@ import Sidebar from './components/Sidebar.jsx'
 import ChatThread from './components/ChatThread.jsx'
 import Composer from './components/Composer.jsx'
 import Toast from './components/Toast.jsx'
-import { askQuestionStream, deleteDocument, getStats, listDocuments, uploadFiles } from './api.js'
+import {
+  askQuestionStream,
+  createConversation,
+  clearConversation,
+  deleteDocument,
+  getStats,
+  listDocuments,
+  uploadFiles,
+} from './api.js'
 
 let nextId = 1
 const makeId = () => nextId++
@@ -13,6 +21,7 @@ export default function App() {
   const [stats, setStats] = useState({ total_documents: 0, total_chunks: 0 })
   const [messages, setMessages] = useState([])
   const [asking, setAsking] = useState(false)
+  const [conversationId, setConversationId] = useState(null)
   const [toast, setToast] = useState({ message: '', visible: false })
   const toastTimer = useRef(null)
 
@@ -63,7 +72,28 @@ export default function App() {
     }
   }
 
+  async function handleClearConversation() {
+    if (conversationId) {
+      try { await clearConversation(conversationId) } catch {}
+    }
+    setMessages([])
+    setConversationId(null)
+    showToast('Conversation cleared.')
+  }
+
   async function handleAsk(question) {
+    // Auto-create conversation on first question
+    let convId = conversationId
+    if (!convId) {
+      try {
+        const conv = await createConversation()
+        convId = conv.conversation_id
+        setConversationId(convId)
+      } catch {
+        // Fall back to stateless if conversation creation fails
+      }
+    }
+
     const userMsg = { id: makeId(), role: 'user', content: question }
     const thinkingMsg = { id: makeId(), role: 'assistant', content: 'Searching sources…', status: 'thinking' }
     setMessages((prev) => [...prev, userMsg, thinkingMsg])
@@ -71,18 +101,16 @@ export default function App() {
 
     let buffer = ''
     let errored = false
+    let tokensSinceRender = 0
 
-    await askQuestionStream(question, null, {
+    await askQuestionStream(question, null, convId, {
       onToken(token) {
-        if (buffer === '') {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === thinkingMsg.id ? { ...m, content: '', status: 'thinking' } : m
-            )
-          )
-        }
         buffer += token
-        if (buffer.length % 3 === 0 || token.includes('\n')) {
+        tokensSinceRender++
+        // Render at most every 5 tokens or on newlines — reduces React reconciliation
+        // overhead during fast streaming while keeping the UI feeling responsive
+        if (tokensSinceRender >= 5 || token.includes('\n')) {
+          tokensSinceRender = 0
           setMessages((prev) =>
             prev.map((m) =>
               m.id === thinkingMsg.id ? { ...m, content: buffer } : m
@@ -132,7 +160,11 @@ export default function App() {
       <main className="main">
         <div className="header">
           <h1>Ask your sources</h1>
-          <p>Answers are grounded in the documents on the left, with citations.</p>
+          {messages.length > 0 && (
+            <button className="clear-conv-btn" onClick={handleClearConversation} title="Clear conversation">
+              Clear chat
+            </button>
+          )}
         </div>
         <ChatThread messages={messages} hasDocuments={documents.length > 0} />
         <Composer onAsk={handleAsk} disabled={asking} />

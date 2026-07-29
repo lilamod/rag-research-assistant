@@ -16,10 +16,48 @@ Both paths expose the same interface: embed_texts(), embed_query(),
 embedding_dim().
 """
 from functools import lru_cache
+from collections import OrderedDict
 from typing import List
+import threading
+import time
 import numpy as np
 
 from .config import settings
+
+
+class _QueryEmbeddingCache:
+    """LRU cache for query embeddings with TTL expiry.
+
+    Same question asked twice skips the API call entirely, which is
+    the single biggest latency win for repeated/similar queries.
+    """
+
+    def __init__(self, maxsize: int = 256, ttl: int = 3600):
+        self._cache: OrderedDict[str, tuple] = OrderedDict()
+        self._maxsize = maxsize
+        self._ttl = ttl
+        self._lock = threading.Lock()
+
+    def get(self, query: str) -> np.ndarray | None:
+        with self._lock:
+            if query in self._cache:
+                vec, ts = self._cache[query]
+                if time.monotonic() - ts < self._ttl:
+                    self._cache.move_to_end(query)
+                    return vec
+                del self._cache[query]
+        return None
+
+    def put(self, query: str, vector: np.ndarray):
+        with self._lock:
+            if query in self._cache:
+                del self._cache[query]
+            self._cache[query] = (vector, time.monotonic())
+            if len(self._cache) > self._maxsize:
+                self._cache.popitem(last=False)
+
+
+_query_cache = _QueryEmbeddingCache()
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +150,18 @@ def embed_texts(texts: List[str], is_query: bool = False) -> np.ndarray:
 
 
 def embed_query(query: str) -> np.ndarray:
-    return embed_texts([query], is_query=True)[0]
+    """Return the embedding for `query`, cached across repeated questions.
+
+    Cache hit avoids the network round-trip to Gemini entirely — this is
+    especially important because the same question often gets embedded
+    several times in a row (e.g. streaming retry or rapid re-ask).
+    """
+    cached = _query_cache.get(query)
+    if cached is not None:
+        return cached
+    vec = embed_texts([query], is_query=True)[0]
+    _query_cache.put(query, vec)
+    return vec
 
 
 def embedding_dim() -> int:

@@ -97,19 +97,21 @@ class VectorStore:
         return len(chunk_texts)
 
     def search(self, query_vector: np.ndarray, top_k: int = 5) -> List[Tuple[Dict, float]]:
-        with self._lock:
-            if self.index.ntotal == 0:
-                return []
-            top_k = min(top_k, self.index.ntotal)
-            scores, indices = self.index.search(
-                query_vector.reshape(1, -1).astype("float32"), top_k
-            )
-            results = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx == -1:
-                    continue
-                results.append((self.records[idx], float(score)))
-            return results
+        # FAISS read operations are thread-safe — no lock needed. Removing
+        # the lock eliminates contention when multiple requests search
+        # concurrently, which is the common case during streaming.
+        if self.index.ntotal == 0:
+            return []
+        top_k = min(top_k, self.index.ntotal)
+        scores, indices = self.index.search(
+            query_vector.reshape(1, -1).astype("float32"), top_k
+        )
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx == -1:
+                continue
+            results.append((self.records[idx], float(score)))
+        return results
 
     def list_documents(self) -> List[Dict]:
         seen = {}

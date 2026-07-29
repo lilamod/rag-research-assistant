@@ -44,21 +44,21 @@ export async function uploadFiles(fileList) {
   return handle(res)
 }
 
-export async function askQuestion(question, topK) {
+export async function askQuestion(question, topK, conversationId) {
   const res = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, top_k: topK ?? null }),
+    body: JSON.stringify({ question, top_k: topK ?? null, conversation_id: conversationId ?? null }),
   })
   return handle(res)
 }
 
-export async function askQuestionStream(question, topK, { onToken, onSources, onError }) {
+export async function askQuestionStream(question, topK, conversationId, { onToken, onSources, onError }) {
   try {
     const res = await fetch(`${API_BASE}/api/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, top_k: topK ?? null }),
+      body: JSON.stringify({ question, top_k: topK ?? null, conversation_id: conversationId ?? null }),
     })
 
     if (!res.ok) {
@@ -99,4 +99,16 @@ export async function askQuestionStream(question, topK, { onToken, onSources, on
   } catch (err) {
     onError(err.message || 'Connection failed')
   }
+}
+
+// --- Conversation management ---
+
+export async function createConversation() {
+  const res = await fetch(`${API_BASE}/api/conversations`, { method: 'POST' })
+  return handle(res)
+}
+
+export async function clearConversation(convId) {
+  const res = await fetch(`${API_BASE}/api/conversations/${convId}`, { method: 'DELETE' })
+  return handle(res)
 }
