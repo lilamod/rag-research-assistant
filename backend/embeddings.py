@@ -74,7 +74,12 @@ def _get_gemini_client():
         )
     # Use API version v1 explicitly — text-embedding-004 is not available
     # on the v1beta endpoint for embedContent.
-    return genai.Client(api_key=settings.GEMINI_API_KEY, api_version="v1")
+    # Note: google-genai >=2.x passes api_version via http_options, not as
+    # a top-level kwarg.
+    return genai.Client(
+        api_key=settings.GEMINI_API_KEY,
+        http_options={"api_version": "v1"},
+    )
 
 
 def _embed_gemini(texts: List[str], task_type: str) -> np.ndarray:
