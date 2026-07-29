@@ -72,7 +72,9 @@ def _get_gemini_client():
             "GEMINI_API_KEY is not set. Required for embeddings. Get a free "
             "key (no card required) at https://aistudio.google.com/apikey"
         )
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    # Use API version v1 explicitly — text-embedding-004 is not available
+    # on the v1beta endpoint for embedContent.
+    return genai.Client(api_key=settings.GEMINI_API_KEY, api_version="v1")
 
 
 def _embed_gemini(texts: List[str], task_type: str) -> np.ndarray:

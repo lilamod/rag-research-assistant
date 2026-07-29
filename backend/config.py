@@ -38,6 +38,8 @@ class Settings:
     )
     # gemini-embedding-001 is deprecated. Use text-embedding-004 which is
     # faster and still supports 768 dim for quality or 384 dim for speed.
+    # Requires API version v1 (the google-genai SDK defaults to v1beta but
+    # text-embedding-004 is not available on v1beta for embedContent).
     GEMINI_EMBEDDING_MODEL: str = os.getenv(
         "GEMINI_EMBEDDING_MODEL", "text-embedding-004"
     )
