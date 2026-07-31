@@ -17,7 +17,10 @@ class Settings:
     LLM_PROVIDER: str = "gemini"
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    # gemini-2.5-flash is the latest Gemini Flash model with improved
+    # reasoning, instruction following, and lower latency vs 2.0-flash.
+    # Change to gemini-2.5-pro for premium reasoning at higher cost/latency.
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     # Lower temperature = more focused, faster responses (less creative sampling)
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     # Higher top_p narrows the sampling window → faster token generation
