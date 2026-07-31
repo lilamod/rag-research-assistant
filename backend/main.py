@@ -147,6 +147,8 @@ def chat(request: ChatRequest):
         )
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Unexpected error: {e}")
     return result
 
 

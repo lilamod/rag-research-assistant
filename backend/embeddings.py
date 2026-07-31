@@ -72,13 +72,13 @@ def _get_gemini_client():
             "GEMINI_API_KEY is not set. Required for embeddings. Get a free "
             "key (no card required) at https://aistudio.google.com/apikey"
         )
-    # Use API version v1 explicitly — text-embedding-004 is not available
-    # on the v1beta endpoint for embedContent.
+    # Pin API version v1 explicitly (stable channel; embedContent is
+    # supported on v1 for gemini-embedding-001, so no need for v1beta).
     # Note: google-genai >=2.x passes api_version via http_options, not as
     # a top-level kwarg.
     return genai.Client(
         api_key=settings.GEMINI_API_KEY,
-        http_options={},
+        http_options={"api_version": "v1"},
     )
 
 

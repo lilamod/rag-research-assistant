@@ -17,10 +17,7 @@ class Settings:
     LLM_PROVIDER: str = "gemini"
 
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    # gemini-2.5-flash is the latest Gemini Flash model with improved
-    # reasoning, instruction following, and lower latency vs 2.0-flash.
-    # Change to gemini-2.5-pro for premium reasoning at higher cost/latency.
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     # Lower temperature = more focused, faster responses (less creative sampling)
     LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     # Higher top_p narrows the sampling window → faster token generation
@@ -39,16 +36,19 @@ class Settings:
     EMBEDDING_MODEL: str = os.getenv(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
-    # gemini-embedding-001 is deprecated. Use text-embedding-004 which is
-    # faster and still supports 768 dim for quality or 384 dim for speed.
-    # Requires API version v1 (the google-genai SDK defaults to v1beta but
-    # text-embedding-004 is not available on v1beta for embedContent).
+    # text-embedding-004 has been discontinued by Google (404s on both v1
+    # and v1beta now). gemini-embedding-001 is the current model — default
+    # output is 3072 dims, but it supports Matryoshka Representation
+    # Learning (MRL), so output_dimensionality can truncate it down (see
+    # GEMINI_EMBEDDING_DIM below) without needing a separate model.
     GEMINI_EMBEDDING_MODEL: str = os.getenv(
-        "GEMINI_EMBEDDING_MODEL", "text-embedding-004"
+        "GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"
     )
-    # 384 is ~2x faster than 768 with minimal quality loss for retrieval.
-    # Bump to 768 if you have very nuanced queries and need the extra precision.
-    GEMINI_EMBEDDING_DIM: int = int(os.getenv("GEMINI_EMBEDDING_DIM", "384"))
+    # gemini-embedding-001 defaults to 3072 dims but supports Matryoshka
+    # truncation. Google officially recommends 768, 1536, or 3072 — other
+    # values (e.g. 384) work but aren't guaranteed the same quality. 768 is
+    # the best low-storage/fast option that's still on the recommended list.
+    GEMINI_EMBEDDING_DIM: int = int(os.getenv("GEMINI_EMBEDDING_DIM", "768"))
 
     # Chunking — smaller = less context for the LLM to chew through
     CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "500"))

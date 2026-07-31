@@ -28,38 +28,6 @@ remain factually accurate to the provided context.
 """
 
 
-# ---------------------------------------------------------------------------
-# Greeting detection — avoids pointless API calls for casual greetings
-# ---------------------------------------------------------------------------
-_GREETING_KEYWORDS = {
-    "hello", "hi", "hey", "greetings", "good morning", "good afternoon",
-    "good evening", "howdy", "what's up", "sup", "yo",
-}
-
-
-def _is_greeting(question: str) -> bool:
-    """Detect if the question is purely a greeting with no actual query.
-
-    Returns True if the message is just a greeting (e.g. "hello", "hi").
-    """
-    q = question.lower().strip().rstrip("?!.,")
-    if q in _GREETING_KEYWORDS:
-        return True
-    # Also check short phrases that start with a greeting
-    words = q.split()
-    if len(words) <= 3 and words[0] in _GREETING_KEYWORDS:
-        return True
-    return False
-
-
-_GREETING_RESPONSE = (
-    "Hello! I'm your research assistant. I can answer questions based on the "
-    "documents you've uploaded. Try asking me something specific about your "
-    "sources — for example, \"What are the key findings in the report?\" or "
-    "\"Summarize the methodology section.\""
-)
-
-
 def _extract_format_instructions(question: str) -> str:
     """Detect formatting/style requests in the user's question.
 
@@ -217,10 +185,6 @@ def generate_answer(
     conversation_history: List[Dict] | None = None,
 ) -> str:
     """Generate a grounded answer. Optionally includes conversation context."""
-    # Handle greetings without hitting the API
-    if _is_greeting(question):
-        return _GREETING_RESPONSE
-
     if not context_chunks:
         return (
             "I couldn't find any relevant documents to answer that question. "
@@ -237,11 +201,6 @@ def generate_answer_stream(
     conversation_history: List[Dict] | None = None,
 ) -> Generator[str, None, None]:
     """Yield answer tokens one at a time from the Gemini streaming API."""
-    # Handle greetings without hitting the API
-    if _is_greeting(question):
-        yield _GREETING_RESPONSE
-        return
-
     if not context_chunks:
         yield (
             "I couldn't find any relevant documents to answer that question. "
@@ -278,7 +237,7 @@ def _call_gemini(user_message: str) -> str:
             raise RuntimeError(
                 f"Gemini model '{settings.GEMINI_MODEL}' is no longer available. "
                 "Update the GEMINI_MODEL environment variable to a supported model "
-                "(e.g. 'gemini-2.5-flash' or 'gemini-2.5-pro')."
+                "(e.g. 'gemini-3.6-flash')."
             ) from exc
         raise
 
@@ -306,6 +265,6 @@ def _call_gemini_stream(user_message: str) -> Generator[str, None, None]:
             raise RuntimeError(
                 f"Gemini model '{settings.GEMINI_MODEL}' is no longer available. "
                 "Update the GEMINI_MODEL environment variable to a supported model "
-                "(e.g. 'gemini-2.5-flash' or 'gemini-2.5-pro')."
+                "(e.g. 'gemini-3.6-flash')."
             ) from exc
         raise
